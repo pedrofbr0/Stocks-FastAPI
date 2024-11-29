@@ -1,6 +1,7 @@
 # app/main.py
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
+from .services import fetch_polygon_open_close_stock_data
 
 
 # class Amount(BaseModel):
@@ -24,3 +25,7 @@ async def update_stock_amount(stock_symbol: str, request: Request):
 # async def update_stock_amount(stock_symbol: str, amount: Amount):
 #     print(amount)
 #     return f'{amount.amount} units of stock {stock_symbol} were added to your stock record'
+
+@app.get("/stock/open_close/{stock_symbol}/{date}")
+async def get_open_close(stock_symbol: str, date: str):
+    return await fetch_polygon_open_close_stock_data(stock_symbol, date)
