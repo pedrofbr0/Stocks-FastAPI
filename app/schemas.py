@@ -1,3 +1,4 @@
+# app/schemas.py
 from pydantic import BaseModel, Field
 from typing import List
 from decimal import Decimal
@@ -34,3 +35,6 @@ class Stock(BaseModel):
     stock_values: StockValues
     performance_data: PerformanceData
     competitors: List[Competitor]
+    
+class Amount(BaseModel):
+    amount: Decimal = Field(..., description="Amount of stock to purchase. Must be a positive number. Values below 4 decimal will not be persisted.")

@@ -3,3 +3,6 @@ uvicorn
 python-dotenv
 httpx
 bs4
+sqlalchemy
+sqlalchemy-utils
+psycopg2
