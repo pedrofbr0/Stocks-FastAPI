@@ -3,8 +3,44 @@ import os
 import httpx
 from bs4 import BeautifulSoup
 import re
+from decimal import Decimal
 
 load_dotenv(find_dotenv())
+
+def convert_market_cap_to_decimal(value: str) -> Decimal:
+    """
+    Convert a string value to a Decimal.
+    """
+    multipliers = {
+        "T": 1000000000000,
+        "B": 1000000000,
+        "M": 1000000,
+        "K": 1000
+    }
+    
+    # Get the multiplier from the last character of the value
+    multiplier = multipliers.get(value[-1], 0)
+    return Decimal(value[:-1]) * multiplier
+
+def convert_performance_percentage_to_float(value: str) -> float:
+    """
+    Convert a percentage string to a float.
+    """
+    return float(value.strip('%')) / 100
+
+def convert_period_to_best_practice(period: str) -> str:
+    """
+    Convert a period string to a best practice period string.
+    """
+    conversion = {
+        "5 Day": "five_days",
+        "1 Month": "one_month",
+        "3 Month": "three_months",
+        "YTD": "year_to_date",
+        "1 Year": "one_year"
+    }
+    return conversion.get(period, period.lower().replace(" ", "_"))
+
 async def fetch_polygon_open_close_stock_data(symbol: str, date: str):
     """
     Fetch open/close stock data from the Polygon API.
@@ -55,9 +91,9 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
         if performance_table:
             rows = performance_table.find_all('tr', {'class': 'table__row'})
             for row in rows:
-                period = row.find('td', {'class': 'table__cell'}).get_text(strip=True)
+                period = convert_period_to_best_practice(row.find('td', {'class': 'table__cell'}).get_text(strip=True))
                 value = row.find('li', {'class': re.compile(r'\bvalue\b')}).get_text(strip=True) # Use regex to match a specific class within the class attribute
-                performance_data[period] = value
+                performance_data[period] = convert_performance_percentage_to_float(value)
 
         # Parse competitors table
         competitors_table = soup.find('table', {'aria-label': 'Competitors data table'})
@@ -80,7 +116,7 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
                     'change': change,
                     'market_cap': {
                         'currency': market_cap_currency, 
-                        'value': market_cap_value
+                        'value': convert_market_cap_to_decimal(market_cap_value)
                     } if regex_match else {
                         'currency': None, 
                         'value': None
