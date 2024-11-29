@@ -1,7 +1,7 @@
 # app/main.py
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
-from .services import fetch_polygon_open_close_stock_data
+from .services import fetch_polygon_open_close_stock_data, fetch_marketwatch_and_scrape_stock_data
 
 
 # class Amount(BaseModel):
@@ -29,3 +29,7 @@ async def update_stock_amount(stock_symbol: str, request: Request):
 @app.get("/stock/open_close/{stock_symbol}/{date}")
 async def get_open_close(stock_symbol: str, date: str):
     return await fetch_polygon_open_close_stock_data(stock_symbol, date)
+
+@app.get("/stock/marketwatch/{stock_symbol}")
+async def get_marketwatch(stock_symbol: str):
+    return await fetch_marketwatch_and_scrape_stock_data(stock_symbol)
