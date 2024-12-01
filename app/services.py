@@ -15,8 +15,10 @@ from app.utils import (
     get_marketwatch_base_url
 )
 from fastapi import HTTPException, status
-from app.exceptions import ExternalAPIError, MarketWatchDataScrapeError
+from app.exceptions import InvalidAPIResponseError, MarketWatchDataScrapeError
 from app.logger import logger
+from app.schemas import PolygonOpenCloseStockDataResponse
+from pydantic import ValidationError
 
 async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
     """
@@ -48,7 +50,7 @@ async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
             raise InvalidAPIResponseError(
                 message="Failed to fetch data from external API.",
                 status_code=response.status_code if response else status.HTTP_500_INTERNAL_SERVER_ERROR,
-                details={"error": str(e)}
+                error_detail={"error": str(e)}
             )
             
         except ValidationError as e:
@@ -56,7 +58,7 @@ async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
             raise InvalidAPIResponseError(
                 message="Invalid data format received from external API.",
                 status_code=status.HTTP_400_BAD_REQUEST,
-                details=e.errors()
+                error_detail=e.errors()
             )
 
         except Exception as e:
@@ -64,7 +66,7 @@ async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
             raise InvalidAPIResponseError(
                 message="An unexpected error occurred while processing the API response.",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                details=e.errors()
+                error_detail=e.errors()
             )
         
 async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
