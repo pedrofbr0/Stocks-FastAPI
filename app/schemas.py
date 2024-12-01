@@ -38,3 +38,26 @@ class Stock(BaseModel):
     
 class Amount(BaseModel):
     amount: Decimal = Field(..., description="Amount of stock to purchase. Must be a positive number. Values below 4 decimal will not be persisted.")
+    
+class AmountResponse(BaseModel):
+    message: str = Field(..., description="\{amount.amount\} units of stock \{stock_symbol\} were added to your stock record")
+    
+class PolygonOpenCloseStockDataResponse(BaseModel):
+    after_hours: float = Field(..., alias="afterHours")
+    close: float   
+    from_: date = Field(..., alias="from",description="The date in the format YYYY-MM-DD")
+    high: float
+    low: float
+    open: float
+    pre_market: float = Field(..., alias="preMarket")
+    status: str
+    volume: int
+    
+class MarketWatchStockDataResponse(BaseModel):
+    company_name: str
+    performance_data: PerformanceData
+    competitors_data: List[Competitor]
+    
+  
+
+

@@ -12,7 +12,7 @@ if not database_exists(DATABASE_URL):
     create_database(DATABASE_URL)
     
 # Create the engine for connecting to the database (Factory pattern)
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL, echo=True) # With echo=True, logs from the database will be displayed
 
 # SessionLocal for interacting with the database
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

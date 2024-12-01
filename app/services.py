@@ -5,15 +5,25 @@ import httpx
 from bs4 import BeautifulSoup
 import re
 from decimal import Decimal
-from app.utils import convert_market_cap_to_decimal, convert_performance_percentage_to_float, convert_period_to_best_practice, get_polygon_base_url, get_polygon_api_key, get_marketwatch_base_url, get_marketwatch_base_url
-
+from app.utils import (
+    convert_market_cap_to_decimal, 
+    convert_performance_percentage_to_float, 
+    convert_period_to_best_practice, 
+    get_polygon_base_url, 
+    get_polygon_api_key, 
+    get_marketwatch_base_url, 
+    get_marketwatch_base_url
+)
+from fastapi import HTTPException
+from app.exceptions import ExternalAPIError, MarketWatchDataError
+from app.logger import logger
 
 async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
     """
-    Fetch open/close stock data from the Polygon API for the given symbol and date.
-    :param symbol: The symbol of the stock to fetch data for.
-    :param date: The date to fetch data for.
-    :return: A dictionary containing the stock data.
+    Fetch open/close stock data from the Polygon API for the given symbol and date.\n
+    {stock_symbol}: The symbol of the stock to fetch data for, e.g. AAPL.\n
+    {date}: The date to fetch data for in the format YYYY-MM-DD. e.g. 2023-04-28.\n
+    RESPONSE: A dictionary containing the polygon open/close API stock data.
     """
     url = f"{get_polygon_base_url()}/{stock_symbol}/{date}"
     params = {"adjusted": "true", "apiKey": get_polygon_api_key()}
@@ -23,8 +33,47 @@ async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            print(f"HTTP error occurred while fetching Polygon data: {e}")
-            return None
+            # error_message = f"HTTP error occurred while fetching Polygon data: {e}"
+            error_status_code = e.response.status_code if e.response else 500
+            error_content = e.response.text[:500] if e.response else "No response content"
+            
+            # # Log the error
+            # logger.error(error_message)
+            # logger.debug(f"Response content: {error_content}")
+            
+            # Attempt to parse the external API's error message
+            error_message_from_api = ""
+            if e.response and 'application/json' in e.response.headers.get('Content-Type', ''):
+                try:
+                    error_json = e.response.json()
+                    error_message_from_api = error_json.get('message', '')
+                except ValueError:
+                    pass  # Response is not valid JSON
+                
+            # Construct the error message
+            error_message = (
+                f"HTTP error occurred while fetching Polygon: {e}"
+                f"External API message: {error_message_from_api}"
+            )
+
+            # Log the error details
+            logger.error(error_message)
+            logger.error(f"Response content: {error_content}")
+            
+            # Raise custom exception with error details
+            raise ExternalAPIError(
+                message=error_message,
+                status_code=error_status_code,
+                error_detail={"content": error_content}
+            )
+        except Exception as e:
+            # Log unexpected errors
+            logger.exception("An unexpected error occurred while fetching Polygon.")
+            raise ExternalAPIError(
+                message="An unexpected error occurred while fetching Polygon.",
+                status_code=500,
+                error_detail={"error": str(e)}
+            )
 
 async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
     """
@@ -45,11 +94,40 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
         try:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
-            html_content = response.text
+            # html_content = response.text
         except httpx.HTTPError as e:
-            print(f"HTTP error occurred while fetching MarketWatch data: {e}")
-            return None
+            # Extract error information
+            # error_message = f"HTTP error occurred while fetching MarketWatch data: {e}"
+            error_status_code = e.response.status_code if e.response else 500
+            error_content = e.response.text[:500] if e.response else "No response content"
 
+           # Attempt to parse the error message if available
+            error_message_from_api = "No error message provided."
+            # MarketWatch may not return a JSON error, so we can include the response text
+            error_message = (
+                f"HTTP error occurred while fetching MarketWatch: {e}"
+                f"External API message: {error_content}"
+            )
+
+            # Log the error details
+            logger.error(error_message)
+
+            # Raise custom exception with error details
+            raise ExternalAPIError(
+                message=error_message,
+                status_code=error_status_code,
+                error_detail={"content": error_content}
+            )
+            
+        except Exception as e:
+            # Log unexpected errors
+            logger.exception("An unexpected error occurred while fetching MarketWatch.")
+            raise ExternalAPIError(
+                message="An unexpected error occurred while fetching MarketWatch.",
+                status_code=500,
+                error_detail={"error": str(e)}
+            )
+        
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Parse company_name
