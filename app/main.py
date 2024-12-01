@@ -1,5 +1,5 @@
 # app/main.py
-from fastapi import FastAPI, Request, HTTPException, Depends, Response
+from fastapi import FastAPI, Request, HTTPException, Depends, Response, status
 from pydantic import BaseModel
 from app.services import fetch_polygon_open_close_stock_data, fetch_marketwatch_and_scrape_stock_data
 from app.schemas import *
@@ -10,16 +10,14 @@ from sqlalchemy.orm import Session
 from app.models import Stocks
 from app.logger import logger
 from cachetools import TTLCache
-from app.exceptions import ExternalAPIError
+from app.exceptions import StocksFastAPIError
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
 # Define a custom exception handler for swagger documentation
-@app.exception_handler(ExternalAPIError)
-async def external_api_error_handler(request: Request, exc: ExternalAPIError):
-    # Log the error details
-    logger.error(f"External API Error: {exc.message}")
+@app.exception_handler(StocksFastAPIError)
+async def external_api_error_handler(request: Request, exc: StocksFastAPIError):
     if exc.error_detail:
         logger.error(f"Error Details: {exc.error_detail}")
     # Return the error response
@@ -28,7 +26,8 @@ async def external_api_error_handler(request: Request, exc: ExternalAPIError):
         content={
             "detail": exc.message,
             "error": exc.error_detail
-        }
+        },
+        message=exc.message
     )
 
 @app.on_event("startup")
@@ -60,18 +59,13 @@ async def get_stock_by_symbol(stock_symbol: str, db_session: Session = Depends(g
     purchased_amount = float(0) if not stock_check else stock_check.purchased_amount
     purchased_status = "Purchased" if stock_check else "Not Purchased"
         
-    # yesterday = date.today() - timedelta(days=2) # Using yesterday's data because we don't have acess to today's data
-    yesterday = '2024-11-28'
+    yesterday = date.today() - timedelta(days=2) # Using yesterday's data because we don't have acess to today's data
     
     # Fetch data from Polygon API
     polygon_data = await fetch_polygon_open_close_stock_data(stock_symbol, yesterday)
-    if not polygon_data:
-        raise HTTPException(status_code=404, detail="Stock data not found from Polygon API")
     
     # Fetch data from MarketWatch
     marketwatch_data = await fetch_marketwatch_and_scrape_stock_data(stock_symbol)
-    if not marketwatch_data:
-        raise HTTPException(status_code=404, detail="Stock data not found from MarketWatch")
     
      # Map Polygon data to StockValues
     stock_values = StockValues(
@@ -84,11 +78,11 @@ async def get_stock_by_symbol(stock_symbol: str, db_session: Session = Depends(g
     # Map MarketWatch performance data
     performance = marketwatch_data.get("performance_data", {})
     performance_data = PerformanceData(
-        five_days=performance.get("five_days", 0.0),
-        one_month=performance.get("one_month", 0.0),
-        three_months=performance.get("three_months", 0.0),
-        year_to_date=performance.get("year_to_date", 0.0),
-        one_year=performance.get("one_year", 0.0)
+        five_days=performance.get("five_days", None),
+        one_month=performance.get("one_month", None),
+        three_months=performance.get("three_months", None),
+        year_to_date=performance.get("year_to_date", None),
+        one_year=performance.get("one_year", None)
     )
 
     # Map MarketWatch competitors data
@@ -111,7 +105,7 @@ async def get_stock_by_symbol(stock_symbol: str, db_session: Session = Depends(g
         purchased_status=purchased_status,
         request_date=polygon_data.get("from"),
         company_code=stock_symbol.upper(),
-        company_name=marketwatch_data.get("company_name") or "N/A",
+        company_name=marketwatch_data.get("company_name", "Unknown"),
         stock_values=stock_values,
         performance_data=performance_data,
         competitors=competitors
@@ -136,7 +130,7 @@ async def update_stock_amount(stock_symbol: str, amount: Amount, db_session: Ses
     :db_session: The database session.\n
     :REPONSE: A message presenting the amount purchased for given stock.
     """
-    stock = db_session.query(Stocks).filter(Stocks.stock_symbol.upper() == stock_symbol).first()
+    stock = db_session.query(Stocks).filter(Stocks.stock_symbol == stock_symbol.upper()).first()
     if not stock:
         # If the stock is not found, create a new record
         stock = Stocks(
@@ -144,11 +138,10 @@ async def update_stock_amount(stock_symbol: str, amount: Amount, db_session: Ses
             purchased_amount=Decimal(amount.amount)
             )
         db_session.add(stock)
-        # db_session.commit()
+
     else:
         # If the stock is found, update the amount
         stock.purchased_amount += Decimal(amount.amount)
-        # db_session.commit()
         
     db_session.commit()
     logger.info(f"Updated purchased amount for {stock_symbol}")

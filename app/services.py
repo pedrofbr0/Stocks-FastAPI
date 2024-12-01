@@ -14,8 +14,8 @@ from app.utils import (
     get_marketwatch_base_url, 
     get_marketwatch_base_url
 )
-from fastapi import HTTPException
-from app.exceptions import ExternalAPIError, MarketWatchDataError
+from fastapi import HTTPException, status
+from app.exceptions import ExternalAPIError, MarketWatchDataScrapeError
 from app.logger import logger
 
 async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
@@ -31,50 +31,42 @@ async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
-            return response.json()
+            
+            # Parse the response JSON
+            json_response = response.json()
+            
+            # Validate the response JSON using the schema
+            json_response_validated = PolygonOpenCloseStockDataResponse(**json_response)
+            
+            logger.info(f"Successfully fetched {get_polygon_base_url()} data for {stock_symbol} on {date}")
+            logger.debug(f"Response: {response.json()}")
+            
+            return json_response
+        
         except httpx.HTTPError as e:
-            # error_message = f"HTTP error occurred while fetching Polygon data: {e}"
-            error_status_code = e.response.status_code if e.response else 500
-            error_content = e.response.text[:500] if e.response else "No response content"
+            logger.error(f"HTTP error occurred: {e}")
+            raise InvalidAPIResponseError(
+                message="Failed to fetch data from external API.",
+                status_code=response.status_code if response else status.HTTP_500_INTERNAL_SERVER_ERROR,
+                details={"error": str(e)}
+            )
             
-            # # Log the error
-            # logger.error(error_message)
-            # logger.debug(f"Response content: {error_content}")
-            
-            # Attempt to parse the external API's error message
-            error_message_from_api = ""
-            if e.response and 'application/json' in e.response.headers.get('Content-Type', ''):
-                try:
-                    error_json = e.response.json()
-                    error_message_from_api = error_json.get('message', '')
-                except ValueError:
-                    pass  # Response is not valid JSON
-                
-            # Construct the error message
-            error_message = (
-                f"HTTP error occurred while fetching Polygon: {e}"
-                f"External API message: {error_message_from_api}"
+        except ValidationError as e:
+            logger.error(f"Validation error: {e}")
+            raise InvalidAPIResponseError(
+                message="Invalid data format received from external API.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                details=e.errors()
             )
 
-            # Log the error details
-            logger.error(error_message)
-            logger.error(f"Response content: {error_content}")
-            
-            # Raise custom exception with error details
-            raise ExternalAPIError(
-                message=error_message,
-                status_code=error_status_code,
-                error_detail={"content": error_content}
-            )
         except Exception as e:
-            # Log unexpected errors
-            logger.exception("An unexpected error occurred while fetching Polygon.")
-            raise ExternalAPIError(
-                message="An unexpected error occurred while fetching Polygon.",
-                status_code=500,
-                error_detail={"error": str(e)}
+            logger.exception(f"An unexpected error occurred: {e}")
+            raise InvalidAPIResponseError(
+                message="An unexpected error occurred while processing the API response.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                details=e.errors()
             )
-
+        
 async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
     """
     Fetch performance and competitors data from MarketWatch for the given stock symbol.
@@ -94,62 +86,54 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
         try:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
-            # html_content = response.text
+            logger.info(f"Successfully fetched {get_marketwatch_base_url()} data for {stock_symbol}")
+            
         except httpx.HTTPError as e:
-            # Extract error information
-            # error_message = f"HTTP error occurred while fetching MarketWatch data: {e}"
-            error_status_code = e.response.status_code if e.response else 500
-            error_content = e.response.text[:500] if e.response else "No response content"
-
-           # Attempt to parse the error message if available
-            error_message_from_api = "No error message provided."
-            # MarketWatch may not return a JSON error, so we can include the response text
-            error_message = (
-                f"HTTP error occurred while fetching MarketWatch: {e}"
-                f"External API message: {error_content}"
-            )
-
-            # Log the error details
-            logger.error(error_message)
-
-            # Raise custom exception with error details
-            raise ExternalAPIError(
-                message=error_message,
-                status_code=error_status_code,
-                error_detail={"content": error_content}
-            )
+            logger.error(f"HTTP error occurred: {e}")
+            raise HTTPException(status_code=response.status_code, detail=f"An error occurred while fetching MarketWatch data. ERROR: {e}")
             
         except Exception as e:
-            # Log unexpected errors
-            logger.exception("An unexpected error occurred while fetching MarketWatch.")
+            logger.error("An unexpected error occurred while fetching MarketWatch.")
             raise ExternalAPIError(
                 message="An unexpected error occurred while fetching MarketWatch.",
-                status_code=500,
-                error_detail={"error": str(e)}
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                error_detail={e.errors()}
             )
         
         soup = BeautifulSoup(response.text, 'html.parser')
+        logger.info(f"Successfully got {get_marketwatch_base_url()} for {stock_symbol} html  for scraping")
 
         # Parse company_name
         company_name = soup.find(
             'h1', {'class': 'company__name'}).get_text(strip=True)
+        if(company_name):
+            logger.info(f"Successfully got company_name from {get_marketwatch_base_url()} for {stock_symbol}: {company_name}")
 
         # Parse performance table
         # Search by text with the help of lambda function
         preformance_text = 'Performance'
         performance_table = soup.find(
             lambda tag: tag.name == "span" and preformance_text in tag.text).parent.parent.parent
-        # performance_table = soup.find('span', {'class': 'performance'})
         performance_data = {}
         if performance_table:
-            rows = performance_table.find_all('tr', {'class': 'table__row'})
-            for row in rows:
-                period = convert_period_to_best_practice(
-                    row.find('td', {'class': 'table__cell'}).get_text(strip=True))
-                value = row.find('li', {'class': re.compile(r'\bvalue\b')}).get_text(
-                    strip=True)  # Use regex to match a specific class within the class attribute
-                performance_data[period] = convert_performance_percentage_to_float(
-                    value)
+            try:
+                rows = performance_table.find_all('tr', {'class': 'table__row'})
+                for row in rows:
+                    period = convert_period_to_best_practice(
+                        row.find('td', {'class': 'table__cell'}).get_text(strip=True))
+                    value = row.find('li', {'class': re.compile(r'\bvalue\b')}).get_text(
+                        strip=True)  # Use regex to match a specific class within the class attribute
+                    performance_data[period] = convert_performance_percentage_to_float(
+                        value)
+                logger.info(f"Successfully got performance data from {get_marketwatch_base_url()} for {stock_symbol}")
+                logger.debug(f"Performance data: {performance_data}")
+            except Exception as e:
+                logger.error(f"Error occurred while parsing MarketWatch data: {e}")
+                raise MarketWatchDataError(
+                    message="An error occurred while parsing MarketWatch data.",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    error_detail=e
+                )
 
         # Parse competitors table
         competitors_table = soup.find(
@@ -157,31 +141,41 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
         competitors_data = []
 
         # Regex pattern to match market cap values form currency and value separation
-        pattern = r"([^\w\s\d]+)\s*(\d[\d.,]*(?:[M|B|T]?)?)"
+        pattern = r"^(.*?)\s*([\d.,]+[kMBT]?)$"
 
         if competitors_table:
-            rows = competitors_table.find('tbody').find_all('tr')
-            for row in rows:
-                name = row.find(
-                    'td', {'class': 'table__cell w50'}).get_text(strip=True)
-                change = row.find('td', {'class': 'table__cell w25'}).find(
-                    'bg-quote').get_text(strip=True)
-                market_cap = row.find(
-                    'td', {'class': 'table__cell w25 number'}).get_text(strip=True)
-                regex_match = re.match(pattern, market_cap.strip())
-                if regex_match:
-                    market_cap_currency, market_cap_value = regex_match.groups()
-                competitors_data.append({
-                    'name': name,
-                    'change': change,
-                    'market_cap': {
-                        'currency': market_cap_currency,
-                        'value': convert_market_cap_to_decimal(market_cap_value)
-                    } if regex_match else {
-                        'currency': None,
-                        'value': None
-                    }
-                })
+            try:
+                rows = competitors_table.find('tbody').find_all('tr')
+                for row in rows:
+                    name = row.find(
+                        'td', {'class': 'table__cell w50'}).get_text(strip=True)
+                    change = row.find('td', {'class': 'table__cell w25'}).find(
+                        'bg-quote').get_text(strip=True)
+                    market_cap = row.find(
+                        'td', {'class': 'table__cell w25 number'}).get_text(strip=True)
+                    regex_match = re.match(pattern, market_cap.strip())
+                    if regex_match:
+                        market_cap_currency, market_cap_value = regex_match.groups()
+                    competitors_data.append({
+                        'name': name,
+                        'change': change,
+                        'market_cap': {
+                            'currency': market_cap_currency,
+                            'value': convert_market_cap_to_decimal(market_cap_value)
+                        } if regex_match else {
+                            'currency': None,
+                            'value': None
+                        }
+                    })
+                logger.info(f"Successfully got competitors data from {get_marketwatch_base_url()} for {stock_symbol}")
+                logger.debug(f"Competitors data: {competitors_data}")
+            except Exception as e:
+                logger.error(f"Error occurred while parsing MarketWatch data: {e}")
+                raise MarketWatchDataError(
+                    message="An error occurred while parsing MarketWatch data.",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    error_detail=e
+                )
 
         return {
             'company_name': company_name,
