@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:13-alpine
+    env_file:
+      - .env.docker
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    env_file:
+      - .env.docker
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    # environment:
+    #   - DB_HOST=${DB_HOST}
+    #   - DB_PORT=${DB_PORT}
+    #   - DB_NAME=${DB_NAME}
+    #   - DB_USER=${DB_USER}
+    #   - DB_PASSWORD=${DB_PASSWORD}
+    #   - POLYGON_BASE_URL=${POLYGON_BASE_URL}
+    #   - POLYGON_API_KEY=${POLYGON_API_KEY}
+    #   - MARKETWATCH_BASE_URL=${MARKETWATCH_BASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  db_data:
+
+networks:
+  backend:
