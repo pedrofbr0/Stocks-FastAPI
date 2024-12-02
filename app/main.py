@@ -36,7 +36,7 @@ def on_startup():
 # Define a cache with a size of 1000 and an expiration time of 60 seconds
 cache = TTLCache(maxsize=1000, ttl=60)
     
-@app.get("/stock/{stock_symbol}", response_model=Stock)
+@app.get("/stock/{stock_symbol}", response_model=Stock, tags=["stock"])
 async def get_stock_by_symbol(stock_symbol: str, db_session: Session = Depends(get_db_session)):
     """
     Retrieve stock data for a given stock symbol. \n
@@ -121,7 +121,7 @@ async def get_stock_by_symbol(stock_symbol: str, db_session: Session = Depends(g
 When other function parameters that are not part of the path parameters are declared, FastAPI automatically assumes they are "query" parameters.
 So, to read the request body, a parameter must be declared with the Request type or the Pydantic model type.
 """
-@app.post("/stock/{stock_symbol}", response_model=AmountResponse, status_code=201) # Modified to return 201 status code when successful, according to assignment requirements
+@app.post("/stock/{stock_symbol}", response_model=AmountResponse, status_code=201, tags=["stock"]) # Modified to return 201 status code when successful, according to assignment requirements
 async def update_stock_amount(stock_symbol: str, amount: Amount, db_session: Session = Depends(get_db_session)):
     """
     Update stock purchase amount, persist the data in a database and return a message presenting the amount purchased for given stock symbol.\n
@@ -153,8 +153,8 @@ async def update_stock_amount(stock_symbol: str, amount: Amount, db_session: Ses
         
     return {"message":f"{amount.amount} units of stock {stock_symbol} were added to your stock record"}
 
-@app.get("/stock/open_close/{stock_symbol}/{date}", response_model=PolygonOpenCloseStockDataResponse)
-async def get_open_close(stock_symbol: str, date: str):
+@app.get("/stock/open_close/{stock_symbol}/{date}", response_model=PolygonOpenCloseStockDataResponse, tags=["polygon"])
+async def get_open_close_stock_values_polygon_api(stock_symbol: str, date: str):
     """
     Fetch open/close stock data from the Polygon API for the given stock symbol and date.\n
     :{stock_symbol}: The symbol of the stock to fetch data for, e.g. AAPL.\n
@@ -163,8 +163,8 @@ async def get_open_close(stock_symbol: str, date: str):
     """
     return await fetch_polygon_open_close_stock_data(stock_symbol, date)
 
-@app.get("/stock/marketwatch/{stock_symbol}", response_model=MarketWatchStockDataResponse)
-async def get_marketwatch(stock_symbol: str):
+@app.get("/stock/marketwatch/{stock_symbol}", response_model=MarketWatchStockDataResponse, tags=["marketwatch"])
+async def get_marketwatch_stock_data_scrape(stock_symbol: str):
     """
     Fetch marketwatch stock data through data scraping given stock symbol.\n
     :{stock_symbol}: The symbol of the stock to fetch data for, e.g. AAPL.\n
