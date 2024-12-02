@@ -1,6 +1,6 @@
 # Stocks-FastAPI
 
-A FastAPI application to retrieve stock data, including open/close values, performance, and competitor information, with data persistence in a PostgreSQL database.
+A FastAPI application to retrieve stock data, including open/close values, performance, and competitor information, with data persistence in a PostgreSQL database. You can check it at https://stocks-fastapi-api.onrender.com/docs
 
 ## Table of Contents
 - [Description](#description)
