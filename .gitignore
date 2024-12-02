@@ -1,8 +1,5 @@
 .venv
-run
 __pycache__
 .env
 .env.docker
 app.log
-up
-down
