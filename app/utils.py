@@ -58,4 +58,3 @@ def get_polygon_api_key():
 
 def get_marketwatch_base_url():
     return os.getenv("MARKETWATCH_BASE_URL")
-

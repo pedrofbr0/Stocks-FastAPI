@@ -26,8 +26,7 @@ async def external_api_error_handler(request: Request, exc: StocksFastAPIError):
         content={
             "detail": exc.message,
             "error": exc.error_detail
-        },
-        message=exc.message
+        }
     )
 
 @app.on_event("startup")
@@ -59,7 +58,8 @@ async def get_stock_by_symbol(stock_symbol: str, db_session: Session = Depends(g
     purchased_amount = float(0) if not stock_check else stock_check.purchased_amount
     purchased_status = "Purchased" if stock_check else "Not Purchased"
         
-    yesterday = date.today() - timedelta(days=2) # Using yesterday's data because we don't have acess to today's data
+    # yesterday = date.today() - timedelta(days=1) # Using yesterday's data because we don't have acess to today's data
+    yesterday = '2024-11-27'
     
     # Fetch data from Polygon API
     polygon_data = await fetch_polygon_open_close_stock_data(stock_symbol, yesterday)

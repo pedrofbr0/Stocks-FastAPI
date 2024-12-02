@@ -46,15 +46,15 @@ async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
             return json_response
         
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error occurred: {e}")
+            logger.error(f"HTTP error occurred: {e}. Status code: {response.status_code}")
             raise InvalidAPIResponseError(
-                message="Failed to fetch data from external API.",
+                message=f"Failed to fetch data from external API. {response.status_code}",
                 status_code=response.status_code if response else status.HTTP_500_INTERNAL_SERVER_ERROR,
-                error_detail={"error": str(e)}
+                error_detail={e}
             )
             
         except ValidationError as e:
-            logger.error(f"Validation error: {e}")
+            logger.error(f"Validation error occurred: {e}. Status code: {response.status_code}")
             raise InvalidAPIResponseError(
                 message="Invalid data format received from external API.",
                 status_code=status.HTTP_400_BAD_REQUEST,
