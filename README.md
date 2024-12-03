@@ -7,11 +7,16 @@ A FastAPI application to retrieve stock data, including open/close values, perfo
 - [Technologies Used](#technologies-used)
 - [Features](#features)
 - [Requirements](#requirements)
-- [Installation and Local Execution](#installation-and-local-execution)
-- [Execution with Docker and Docker Compose](#execution-with-docker-and-docker-compose)
-- [Testing](#testing)
+- [Local Setup](#localsetup)
+  * [Installation](#installation)
+  * [Running the Application](#running-the-application)
+  * [Running Tests Locally](#running-tests-locally)
+- [Docker Compose Setup](#docker-compose-setup)
+  * [Docker Installation](#docker-installation)
+  * [Execution with Docker Compose](#execution-with-docker-and-docker-compose)
 - [API Endpoints](#api-endpoints)
 - [Motivation and Technological Choices](#motivation-and-technological-choices)
+- [Next Steps](#next-steps)
 - [Contribution](#contribution)
 - [License](#license)
 
@@ -55,30 +60,42 @@ The application also enables users to update the amount of purchased stocks, per
 - **Docker and Docker Compose** (optional for containerized execution)
 - **Polygon.io API Key** (required for API calls)
 
-## Installation and Local Execution
+## Local Setup
+
+Follow these steps to set up and run the application locally.
  
 ### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/your-username/stocks-fastapi.git
 cd stocks-fastapi
 ```
 
-### 2. Create and Activate a Virtual Environment
+### 2. Create a Virtual Environment
+
+It's recommended to use a virtual environment to manage dependencies.
 ```bash
-python -m venv venv
-# Activate the virtual environment
-# On Windows:
-venv\Scripts\activate
-# On Linux/Mac:
+python -m venv .venv
+```
+
+### 3. Activate the Virtual Environment
+- On Windows:
+```bash
+.venv\Scripts\activate
+```
+- On Unix or MacOS:
+```bash
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 4. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set Up Environment Variables
+### 5. Set Up Environment Variables
+
 Create a **.env** file in the project root with the following content:
 ```dotenv
 # Database
@@ -97,20 +114,29 @@ MARKETWATCH_BASE_URL=https://www.marketwatch.com/investing/stock
 ```
 Replace **your_database_password** and **your_polygon_api_key** with appropriate values.
 
-### 5. Set Up the Database
+## Running the Application
 Ensure PostgreSQL is installed and running on your machine.
-Create the database specified in **DB_NAME**.
 
-### 6. Run the Application
+## Run the Application
+1. Start the FastAPI Server
 ```bash
 uvicorn app.main:app --reload
 ```
 The application will be available at http://localhost:8000.
 
-### 7. API Documentation
-Access http://localhost:8000/docs for interactive documentation (Swagger UI).
+2. Access the API Documentation
+- Access http://localhost:8000/docs for interactive documentation (Swagger UI).
 
-## Execution with Docker and Docker Compose
+## Running Tests Locally
+To run the test suite locally, follow these steps:
+1. Ensure the Virtual Environment is Activated
+If not already activated, activate your virtual environment.
+2. Run the Tests
+3. ```bash
+   pytest tests/
+   ```
+
+## Docker-Compose Setup
 
 ### 1. Set Up Environment Variables
 Create a **.env.docker** file in the project root with the following content:
@@ -136,21 +162,15 @@ Note: **DB_HOST** is set to **db** for Docker Compose.
 ```bash
 docker compose up --build
 ```
-This will start the **web** and **db** services defined in **docker-compose.yaml**.
+This will start the **web** and **db** services defined in **docker-compose.yaml** (This command builds the images, if not already built, and starts the containers.)
 
 ### 3. Access the Application
 The application will be available at http://localhost:8000.
 
-## Testing
-
-### 1. Run Unit Tests
+### 4. View Logs
+To view logs from the containers:
 ```bash
-pytest tests/
-```
-
-### 2. Check Code Coverage
-```bash
-pytest --cov=app tests/
+docker-compose logs -f
 ```
 
 ## API Endpoints
@@ -166,7 +186,7 @@ pytest --cov=app tests/
 - Request Body:
 ```json
 {
-  "amount": 10
+  "amount": 5.33
 }
 ```
 
@@ -187,6 +207,9 @@ GET **/stock/marketwatch/{stock_symbol}**
 - BeautifulSoup4: Powerful library for web scraping.
 - Docker & Docker Compose: Simplifies deployment and ensures environment consistency.
 - Pytest: Testing framework for writing simple and efficient tests.
+
+## Next Steps
+## Data Persistence of stock model (with SQLAlchemy) and database migration with Alembic.
 
 ## Contribution
 Contributions are welcome! Feel free to open issues and pull requests.

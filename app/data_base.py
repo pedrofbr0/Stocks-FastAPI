@@ -17,6 +17,7 @@ engine = create_engine(DATABASE_URL, echo=True) # With echo=True, logs from the 
 # SessionLocal for interacting with the database
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Base class for the database models
 Base = declarative_base()
 
 def create_tables_if_not_exists():

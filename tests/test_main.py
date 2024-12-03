@@ -1,12 +1,12 @@
 # tests/test_main.py
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.data_base import get_db_session, Base, engine
 from sqlalchemy.orm import sessionmaker
 from app.models import Stocks
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 TestingSessionLocal = sessionmaker(
     autocommit=False, autoflush=False, bind=engine)
@@ -65,7 +65,8 @@ async def test_get_stock_by_symbol(setup_database):
             'competitors_data': []
         }
 
-        async with AsyncClient(app=app, base_url="http://test") as ac:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.get(f"/stock/{stock_symbol}")
         assert response.status_code == 200
         data = response.json()
@@ -77,7 +78,8 @@ async def test_update_stock_amount(setup_database):
     stock_symbol = "AAPL"
     payload = {"amount": 10}
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         response = await ac.post(f"/stock/{stock_symbol}", json=payload)
     assert response.status_code == 201
     data = response.json()

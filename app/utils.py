@@ -1,5 +1,5 @@
 # app/utils.py
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from dotenv import load_dotenv, find_dotenv
 import os
 
@@ -10,15 +10,26 @@ def convert_market_cap_to_decimal(value: str) -> Decimal:
     Convert a string value to a Decimal.
     """
     multipliers = {
-        "T": 1000000000000,
-        "B": 1000000000,
-        "M": 1000000,
-        "K": 1000
+        "T": Decimal("1e12"),
+        "B": Decimal("1e9"),
+        "M": Decimal("1e6"),
+        "K": Decimal("1e3")
     }
     
     # Get the multiplier from the last character of the value
-    multiplier = multipliers.get(value[-1], 0)
-    return Decimal(value[:-1]) * multiplier
+    unit = value[-1]
+    multiplier = multipliers.get(unit.upper(), None)
+    if multiplier:
+        number = value[:-1]
+        try:
+            return Decimal(number) * multiplier
+        except InvalidOperation:
+            raise ValueError(f"Invalid number format: {number}")
+    else:
+        try:
+            return Decimal(value)
+        except InvalidOperation:
+            raise ValueError(f"Invalid value: {value}")
 
 def convert_performance_percentage_to_float(value: str) -> float:
     """

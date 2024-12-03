@@ -5,10 +5,10 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Copia o arquivo de requisitos para o contêiner
-COPY dependencies.txt .
+COPY requirements.txt .
 
 # Instala as dependências
-RUN pip install --no-cache-dir -r dependencies.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copia o código da aplicação para o contêiner
 COPY . .

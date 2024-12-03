@@ -15,7 +15,7 @@ from app.utils import (
     get_marketwatch_base_url
 )
 from fastapi import HTTPException, status
-from app.exceptions import InvalidAPIResponseError, MarketWatchDataScrapeError
+from app.exceptions import InvalidAPIResponseError, MarketWatchDataScrapeError, ExternalAPIError
 from app.logger import logger
 from app.schemas import PolygonOpenCloseStockDataResponse
 from pydantic import ValidationError
@@ -45,28 +45,30 @@ async def fetch_polygon_open_close_stock_data(stock_symbol: str, date: str):
             
             return json_response
         
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error occurred: {e}. Status code: {response.status_code}")
+        except ValidationError as e:
+            logger.error(f"Validation error while parsing data from Polygon: {e}")
             raise InvalidAPIResponseError(
-                message=f"Failed to fetch data from external API. {response.status_code}",
-                status_code=response.status_code if response else status.HTTP_500_INTERNAL_SERVER_ERROR,
-                error_detail={e}
+                message="Failed to validate response from external API.",
+                error_detail={"error": str(e)},
+                status_code=500
             )
             
-        except ValidationError as e:
-            logger.error(f"Validation error occurred: {e}. Status code: {response.status_code}")
-            raise InvalidAPIResponseError(
-                message="Invalid data format received from external API.",
-                status_code=status.HTTP_400_BAD_REQUEST,
-                error_detail=e.errors()
-            )
-
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error while fetching data from Polygon: {e}")
+            raise ExternalAPIError(
+            message=f"Failed to fetch data from external API. {e}",
+            error_detail={"error": e.response.content.decode("utf-8")},
+            status_code=e.response.status_code
+        )
+        
         except Exception as e:
-            logger.exception(f"An unexpected error occurred: {e}")
-            raise InvalidAPIResponseError(
-                message="An unexpected error occurred while processing the API response.",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                error_detail=e.errors()
+            logger.exception(f"Unexpected error while fetching data from Polygon: {e}")
+            status_code = e.response.status_code if hasattr(e, 'response') else 500
+            error_content = e.response.content.decode("utf-8") if hasattr(e, 'response') and e.response.content else str(e)
+            raise ExternalAPIError(
+                message=f"An unexpected error occurred while fetching data from external API. {e}",
+                error_detail={"error": error_content},
+                status_code=status_code
             )
         
 async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
@@ -90,16 +92,22 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
             response.raise_for_status()
             logger.info(f"Successfully fetched {get_marketwatch_base_url()} data for {stock_symbol}")
             
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error occurred: {e}")
-            raise HTTPException(status_code=response.status_code, detail=f"An error occurred while fetching MarketWatch data. ERROR: {e}")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error while fetching URL from Marketwatch: {e}")
+            raise ExternalAPIError(
+            message=f"Failed to fetch URL. {e}",
+            error_detail={"error": e.response.content.decode("utf-8")},
+            status_code=e.response.status_code
+        )
             
         except Exception as e:
-            logger.error("An unexpected error occurred while fetching MarketWatch.")
-            raise ExternalAPIError(
-                message="An unexpected error occurred while fetching MarketWatch.",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                error_detail={e.errors()}
+            logger.exception(f"Unexpected error during scraping for {stock_symbol}: {e}")
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response else 500
+            error_content = e.response.content.decode("utf-8") if hasattr(e, 'response') and e.response and e.response.content else str(e)
+            raise MarketWatchDataScrapeError(
+                message=f"An unexpected error occurred during data scraping. {e}",
+                error_detail={"error": error_content},
+                status_code=status_code
             )
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -107,10 +115,17 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
 
         # Parse company_name
         company_name = soup.find(
-            'h1', {'class': 'company__name'}).get_text(strip=True)
+            'h1', {'class': 'company__name'})
         if(company_name):
+            company_name = company_name.get_text(strip=True)
             logger.info(f"Successfully got company_name from {get_marketwatch_base_url()} for {stock_symbol}: {company_name}")
-
+        else:
+            logger.error(f"Failed to extract company name for {stock_symbol}")
+            raise MarketWatchDataScrapeError(
+                message=f"Failed to extract company name from MarketWatch page for {stock_symbol}.",
+                error_detail={"error": "Company name not found in page."},
+                status_code=500
+            )
         # Parse performance table
         # Search by text with the help of lambda function
         preformance_text = 'Performance'
@@ -130,11 +145,11 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
                 logger.info(f"Successfully got performance data from {get_marketwatch_base_url()} for {stock_symbol}")
                 logger.debug(f"Performance data: {performance_data}")
             except Exception as e:
-                logger.error(f"Error occurred while parsing MarketWatch data: {e}")
-                raise MarketWatchDataError(
-                    message="An error occurred while parsing MarketWatch data.",
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    error_detail=e
+                logger.exception(f"Unexpected error during scraping for {stock_symbol}: {e}")
+                raise MarketWatchDataScrapeError(
+                    message=f"An unexpected error occurred during data scraping. {e}",
+                    error_detail={"error": e.response.content.decode("utf-8")},
+                    status_code=status.HTTP_204_NO_CONTENT
                 )
 
         # Parse competitors table
@@ -172,11 +187,11 @@ async def fetch_marketwatch_and_scrape_stock_data(stock_symbol: str):
                 logger.info(f"Successfully got competitors data from {get_marketwatch_base_url()} for {stock_symbol}")
                 logger.debug(f"Competitors data: {competitors_data}")
             except Exception as e:
-                logger.error(f"Error occurred while parsing MarketWatch data: {e}")
-                raise MarketWatchDataError(
-                    message="An error occurred while parsing MarketWatch data.",
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    error_detail=e
+                logger.exception(f"Unexpected error during scraping for {stock_symbol}: {e}")
+                raise MarketWatchDataScrapeError(
+                    message=f"An unexpected error occurred during data scraping. {e}",
+                    error_detail={"error": e.response.content.decode("utf-8")},
+                    status_code=status.HTTP_204_NO_CONTENT
                 )
 
         return {

@@ -28,15 +28,6 @@ services:
       - .:/app
     ports:
       - "8000:8000"
-    # environment:
-    #   - DB_HOST=${DB_HOST}
-    #   - DB_PORT=${DB_PORT}
-    #   - DB_NAME=${DB_NAME}
-    #   - DB_USER=${DB_USER}
-    #   - DB_PASSWORD=${DB_PASSWORD}
-    #   - POLYGON_BASE_URL=${POLYGON_BASE_URL}
-    #   - POLYGON_API_KEY=${POLYGON_API_KEY}
-    #   - MARKETWATCH_BASE_URL=${MARKETWATCH_BASE_URL}
     depends_on:
       db:
         condition: service_healthy
