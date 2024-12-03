@@ -1,6 +1,7 @@
 # Stocks-FastAPI
 
-A FastAPI application to retrieve stock data, including open/close values, performance, and competitor information, with data persistence in a PostgreSQL database. You can check it at https://stocks-fastapi-api.onrender.com/docs
+A FastAPI application to retrieve stock data, including open/close values, performance, and competitor information, with stock transaction data persistence in a PostgreSQL database. 
+You can check it at https://stocks-fastapi-api.onrender.com/docs.
 
 ## Table of Contents
 - [Description](#description)
@@ -11,9 +12,9 @@ A FastAPI application to retrieve stock data, including open/close values, perfo
   * [Installation](#installation)
   * [Running the Application](#running-the-application)
   * [Running Tests Locally](#running-tests-locally)
-- [Docker Compose Setup](#docker-compose-setup)
+- [Docker-Compose Setup](#docker-compose-setup)
   * [Docker Installation](#docker-installation)
-  * [Execution with Docker Compose](#execution-with-docker-and-docker-compose)
+  * [Running with Docker-Compose](#running-with-docker-compose)
 - [API Endpoints](#api-endpoints)
 - [Motivation and Technological Choices](#motivation-and-technological-choices)
 - [Next Steps](#next-steps)
@@ -117,7 +118,6 @@ Replace **your_database_password** and **your_polygon_api_key** with appropriate
 ## Running the Application
 Ensure PostgreSQL is installed and running on your machine.
 
-## Run the Application
 1. Start the FastAPI Server
 ```bash
 uvicorn app.main:app --reload
@@ -137,7 +137,12 @@ If not already activated, activate your virtual environment.
    ```
 
 ## Docker-Compose Setup
+To use Docker/Docker-Compose to run the project you need to properly install it in your system. 
 
+## Docker Installation
+Refer to this repo https://github.com/codeedu/wsl2-docker-quickstart/blob/main/README.en.md for more information.
+
+## Running with Docker-Compose
 ### 1. Set Up Environment Variables
 Create a **.env.docker** file in the project root with the following content:
 
